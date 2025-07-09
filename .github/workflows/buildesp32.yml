@@ -1,0 +1,140 @@
+name: ESP32 MicroPython Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - '**'
+    paths:
+      - 'src/**'
+      - '.github/workflows/*.yml'
+      - 'boards/**'
+    tags-ignore:
+      - 'v*'
+  pull_request:
+    branches:
+      - master
+    paths:
+      - 'src/**'
+      - '.github/workflows/*.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  MICROPYTHON_DIR: ~/micropython
+  ESP_IDF_DIR: ~/esp-idf
+  ARTIFACTS_DIR: ~/artifacts
+  MPY_VERSION: v1.25.0
+  ESP_IDF_VERSION: v5.4.1
+
+jobs:
+  setup-environment:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Cache ESP-IDF and MicroPython
+        id: cache_esp_idf
+        uses: actions/cache@v4
+        with:
+          lookup-only: true
+          path: |
+            ${{ env.ESP_IDF_DIR }}
+            ~/.espressif/
+            ~/.cache/pip/
+            ${{ env.MICROPYTHON_DIR }}
+          key: mpy-${{ env.MPY_VERSION }}-idf-${{ env.ESP_IDF_VERSION }}
+          restore-keys: |
+            mpy-${{ env.MPY_VERSION }}-idf-
+            mpy-
+
+      - name: Install dependencies (if not cached)
+        if: steps.cache_esp_idf.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git wget flex bison gperf python3 python3-pip python3-venv cmake ninja-build ccache libffi-dev libssl-dev dfu-util libusb-1.0-0
+
+      - name: Clone MicroPython specific version (if not cached)
+        if: steps.cache_esp_idf.outputs.cache-hit != 'true'
+        run: |
+          cd ~
+          git clone --depth 1 --branch ${{ env.MPY_VERSION }} https://github.com/micropython/micropython.git ${{ env.MICROPYTHON_DIR }}
+          cd ${{ env.MICROPYTHON_DIR }}
+          git submodule update --init --depth 1
+          cd mpy-cross && make
+
+      - name: Set up ESP-IDF specific version (if not cached)
+        if: steps.cache_esp_idf.outputs.cache-hit != 'true'
+        run: |
+          cd ~
+          git clone --depth 1 --branch ${{ env.ESP_IDF_VERSION }} https://github.com/espressif/esp-idf.git ${{ env.ESP_IDF_DIR }}
+          git -C ${{ env.ESP_IDF_DIR }} submodule update --init --recursive --filter=tree:0
+          cd ${{ env.ESP_IDF_DIR }} && ./install.sh esp32,esp32s3,esp32c3
+          source ./export.sh
+
+  build:
+    needs: setup-environment
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - { board: "ESP32_GENERIC_S3", variant: "SPIRAM_OCT", flash_size: "16" }
+          - { board: "ESP32_GENERIC_C3", variant: "", flash_size: "8" }
+          - { board: "ESP32_GENERIC", variant: "SPIRAM", flash_size: "4" }
+
+    steps:
+      - name: Cache ESP-IDF and MicroPython
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.ESP_IDF_DIR }}
+            ~/.espressif/
+            ~/.cache/pip/
+            ${{ env.MICROPYTHON_DIR }}
+          key: mpy-${{ env.MPY_VERSION }}-idf-${{ env.ESP_IDF_VERSION }}
+          restore-keys: |
+            mpy-${{ env.MPY_VERSION }}-idf-
+            mpy-
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build MicroPython
+        run: |
+          source ${{ env.ESP_IDF_DIR }}/export.sh
+          cd ${{ github.workspace }}/boards/
+          
+          IDF_CMD="idf.py -D MICROPY_DIR=${{ env.MICROPYTHON_DIR }} -D MICROPY_BOARD=${{ matrix.config.board }} -B build-${{ matrix.config.board }}"
+          
+          if [ -n "${{ matrix.config.variant }}" ]; then
+              IDF_CMD="$IDF_CMD -D MICROPY_BOARD_VARIANT=${{ matrix.config.variant }}"
+          fi
+          
+          IDF_CMD="$IDF_CMD -D MICROPY_FLASH_SIZE=${{ matrix.config.flash_size }}MB"
+          
+          eval "$IDF_CMD build"
+
+          cd build-${{ matrix.config.board }}
+          python ${{ env.MICROPYTHON_DIR }}/ports/esp32/makeimg.py sdkconfig bootloader/bootloader.bin partition_table/partition-table.bin micropython.bin firmware.bin micropython.uf2
+          
+          mkdir -p ${{ env.ARTIFACTS_DIR }}
+          mv firmware.bin ${{ env.ARTIFACTS_DIR }}/firmware-${{ matrix.config.board }}-${{ matrix.config.variant }}-${{ matrix.config.flash_size }}MB.bin
+
+      - name: Upload firmware artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-${{ matrix.config.board }}-${{ matrix.config.variant }}-${{ matrix.config.flash_size }}MB
+          path: ${{ env.ARTIFACTS_DIR }}/firmware-${{ matrix.config.board }}-${{ matrix.config.variant }}-${{ matrix.config.flash_size }}MB.bin
+          retention-days: 5
+
+      - name: Upload build logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs-${{ matrix.config.board }}
+          path: |
+            ${{ github.workspace }}/boards/build-${{ matrix.config.board }}/log/
+          retention-days: 5
