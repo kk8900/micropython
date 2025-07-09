@@ -8,7 +8,7 @@ on:
     paths:
       - 'src/**'
       - '.github/workflows/*.yml'
-      - 'boards/**'
+      - 'ports/esp32/boards/**'
     tags-ignore:
       - 'v*'
   pull_request:
@@ -17,6 +17,7 @@ on:
     paths:
       - 'src/**'
       - '.github/workflows/*.yml'
+      - 'ports/esp32/boards/**'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -105,7 +106,7 @@ jobs:
       - name: Build MicroPython
         run: |
           source ${{ env.ESP_IDF_DIR }}/export.sh
-          cd ${{ github.workspace }}/boards/
+          cd ${{ env.MICROPYTHON_DIR }}/ports/esp32/boards/
           
           IDF_CMD="idf.py -D MICROPY_DIR=${{ env.MICROPYTHON_DIR }} -D MICROPY_BOARD=${{ matrix.config.board }} -B build-${{ matrix.config.board }}"
           
@@ -136,5 +137,5 @@ jobs:
         with:
           name: build-logs-${{ matrix.config.board }}
           path: |
-            ${{ github.workspace }}/boards/build-${{ matrix.config.board }}/log/
+            ${{ env.MICROPYTHON_DIR }}/ports/esp32/boards/build-${{ matrix.config.board }}/log/
           retention-days: 5
