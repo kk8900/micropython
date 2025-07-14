@@ -70,6 +70,7 @@ jobs:
           cd ${{ env.ESP_IDF_DIR }}
           git submodule update --init --recursive --filter=tree:0
           ./install.sh esp32,esp32s3,esp32c3
+          source ./export.sh  # 导入 ESP-IDF 的环境变量
 
   # ----------------------------------------------------------------
   # 2) 并行构建多款固件
@@ -85,30 +86,10 @@ jobs:
           - board: ESP32_GENERIC_S3
             variant: SPIRAM_OCT
             flash_size: 16
-          - board: ESP32_GENERIC_S3
-            variant: SPIRAM_OCT
-            flash_size: 8
           - board: ESP32_GENERIC_C3
             variant: ""
             flash_size: 4
-          - board: ESP32_GENERIC_C3
-            variant: ""
-            flash_size: 8
-          - board: ESP32_GENERIC_C3
-            variant: ""
-            flash_size: 16
-          - board: ESP32_GENERIC
-            variant: SPIRAM
-            flash_size: 4
-          - board: ESP32_GENERIC
-            variant: SPIRAM
-            flash_size: 8
-          - board: ESP32_GENERIC
-            variant: SPIRAM
-            flash_size: 16
-          - board: ESP32_GENERIC
-            variant: ""
-            flash_size: 8
+
     steps:
       # 2.1 恢复缓存
       - name: 恢复缓存
