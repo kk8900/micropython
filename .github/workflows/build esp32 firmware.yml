@@ -102,16 +102,11 @@ jobs:
             ${{ env.MICROPYTHON_DIR }}
           key: mpy-${{ env.MPY_VERSION }}-idf-${{ env.ESP_IDF_VERSION }}
 
-      # 2.2 导入 ESP-IDF 环境
-      - name: 导入 ESP-IDF 环境
-        run: |
-          source ${{ env.ESP_IDF_DIR }}/export.sh
-          echo "IDF_PATH=${{ env.ESP_IDF_DIR }}" >> $GITHUB_ENV
-          echo "${{ env.ESP_IDF_DIR }}/tools" >> $GITHUB_PATH
-
       # 2.3 编译固件（BOARD_VARIANT 为空时留空）
       - name: 编译固件
         run: |
+          source ${{ env.ESP_IDF_DIR }}/export.sh
+          
           cd ${{ env.MICROPYTHON_DIR }}/ports/esp32
           # BOARD_VARIANT 为空时 make 会自动忽略
           make BOARD=${{ matrix.board }} \
