@@ -89,6 +89,9 @@ jobs:
           - board: ESP32_GENERIC_C3
             variant: ""
             flash_size: 4
+          - board: ESP32_GENERIC
+            variant: SPIRAM
+            flash_size: 4
 
     steps:
       # 2.1 恢复缓存
@@ -102,7 +105,7 @@ jobs:
             ${{ env.MICROPYTHON_DIR }}
           key: mpy-${{ env.MPY_VERSION }}-idf-${{ env.ESP_IDF_VERSION }}
 
-      # 2.3 编译固件（BOARD_VARIANT 为空时留空）
+      # 2.2 编译固件（BOARD_VARIANT 为空时留空）
       - name: 编译固件
         run: |
           source ${{ env.ESP_IDF_DIR }}/export.sh
@@ -114,7 +117,7 @@ jobs:
                FLASH_SIZE=${{ matrix.flash_size }}MB \
                -j$(nproc)
 
-      # 2.4 生成友好命名的 bin 文件
+      # 2.3 生成友好命名的 bin 文件
       # 命名规则：{board}[_variant]_{flash_size}MB.bin
       - name: 重命名固件
         run: |
@@ -136,7 +139,7 @@ jobs:
             exit 1
           fi
 
-      # 2.5 上传构建产物
+      # 2.4 上传构建产物
       - name: 上传固件到 Actions
         uses: actions/upload-artifact@v4
         with:
