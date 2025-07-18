@@ -18,7 +18,7 @@ env:
   MICROPYTHON_DIR: ${{ github.workspace }}/micropython
   ARTIFACTS_DIR: ${{ github.workspace }}/artifacts
   ESP_IDF_VERSION: v5.4.1
-  MPY_VERSION: master   # 可换成 tag / commit
+  MPY_VERSION: master
 
 jobs:
   # ----------------------------------------------------------------
@@ -81,7 +81,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 使用 include 方式列出所有要构建的板子/配置
+        # 列出所有要构建的板子/配置
         include:
           - board: ESP32_GENERIC_S3
             variant: SPIRAM_OCT
